@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F4F7F6"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/btn_back_create"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Back"
+            android:textColor="@color/brand_navy"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Create New User"
+            android:textColor="@color/brand_navy"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:letterSpacing="-0.02"
+            android:layout_marginBottom="32dp"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:background="@android:color/white">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Full Name"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_navy"
+                    android:layout_marginBottom="8dp"/>
+                <EditText
+                    android:id="@+id/create_input_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/input_border"
+                    android:paddingHorizontal="16dp"
+                    android:hint="John Doe"
+                    android:inputType="textPersonName"
+                    android:layout_marginBottom="16dp"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Email Address"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_navy"
+                    android:layout_marginBottom="8dp"/>
+                <EditText
+                    android:id="@+id/create_input_email"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/input_border"
+                    android:paddingHorizontal="16dp"
+                    android:hint="user@gopark.com"
+                    android:inputType="textEmailAddress"
+                    android:layout_marginBottom="16dp"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Temporary Password"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_navy"
+                    android:layout_marginBottom="8dp"/>
+                <EditText
+                    android:id="@+id/create_input_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/input_border"
+                    android:paddingHorizontal="16dp"
+                    android:hint="Minimum 6 characters"
+                    android:inputType="textPassword"
+                    android:layout_marginBottom="16dp"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Account Role"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_navy"
+                    android:layout_marginBottom="8dp"/>
+                <Spinner
+                    android:id="@+id/create_spinner_role"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/input_border"
+                    android:paddingHorizontal="12dp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_create_account"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Create Account"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            app:backgroundTint="@color/brand_navy"
+            app:cornerRadius="12dp" />
+
+    </LinearLayout>
+
+    <include layout="@layout/layout_loader" />
+    <include layout="@layout/layout_notification" />
+
+</FrameLayout>

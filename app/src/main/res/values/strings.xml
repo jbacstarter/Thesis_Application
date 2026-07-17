@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Thesis Application</string>
+    <string name="button">Button</string>
+    <string name="forgot_password"><u>Forgot Password? <a href="www.google.com" /></u></string>
+    <string name="parking_spot_title">Parking Spot (%1$d, %2$d)</string>
+    <string name="status_occupied">Status: OCCUPIED</string>
+    <string name="status_available">Status: AVAILABLE</string>
+    <string name="spot_unavailable">Spot Unavailable</string>
+    <string name="navigate_to_spot">Navigate to Spot</string>
+</resources>
