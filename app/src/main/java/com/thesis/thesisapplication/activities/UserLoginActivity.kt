@@ -155,7 +155,7 @@
                                 startActivity(intent)
                                 finish()
                             } else {
-                                val intent = Intent(this, ParkingViewSelectorActivity::class.java)
+                                val intent = Intent(this, Navigation::class.java)
                                 startActivity(intent)
                                 finish()
                             }

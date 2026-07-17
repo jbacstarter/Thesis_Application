@@ -5,6 +5,7 @@
     "project_id": "john-c883b",
     "storage_bucket": "john-c883b.firebasestorage.app"
   },
+
   "client": [
     {
       "client_info": {
