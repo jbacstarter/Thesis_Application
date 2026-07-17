@@ -155,7 +155,7 @@
                                 startActivity(intent)
                                 finish()
                             } else {
-                                val intent = Intent(this, Navigation::class.java)
+                                val intent = Intent(this, ParkingMapActivity::class.java)
                                 startActivity(intent)
                                 finish()
                             }
