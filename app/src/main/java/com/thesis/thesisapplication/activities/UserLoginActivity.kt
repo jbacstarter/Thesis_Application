@@ -15,6 +15,7 @@
     import com.google.firebase.auth.FirebaseAuth
     import com.google.firebase.firestore.FirebaseFirestore
     import com.thesis.thesisapplication.R
+    import com.thesis.thesisapplication.helpers.ParkingView
     import com.thesis.thesisapplication.helpers.hideLoading
     import com.thesis.thesisapplication.helpers.showCustomNotification
     import com.thesis.thesisapplication.helpers.showLoading
@@ -155,7 +156,7 @@
                                 startActivity(intent)
                                 finish()
                             } else {
-                                val intent = Intent(this, ParkingMapActivity::class.java)
+                                val intent = Intent(this, ParkingViewSelectorActivity::class.java)
                                 startActivity(intent)
                                 finish()
                             }

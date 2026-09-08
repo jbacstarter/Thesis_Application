@@ -11,12 +11,12 @@ import androidx.core.app.ActivityCompat
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
+import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.MapInitOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.plugin.LocationPuck2D
-import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.attribution.attribution
 import com.mapbox.maps.plugin.compass.compass
 import com.mapbox.maps.plugin.locationcomponent.createDefault2DPuck
@@ -34,8 +34,6 @@ import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationObserver
 import com.mapbox.navigation.core.lifecycle.requireMapboxNavigation
-import com.mapbox.navigation.core.replay.route.ReplayProgressObserver
-import com.mapbox.navigation.core.replay.route.ReplayRouteMapper
 import com.mapbox.navigation.core.trip.session.LocationMatcherResult
 import com.mapbox.navigation.core.trip.session.LocationObserver
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
@@ -52,25 +50,23 @@ class Navigation : ComponentActivity() {
     private lateinit var navigationCamera: NavigationCamera
     private lateinit var routeLineApi: MapboxRouteLineApi
     private lateinit var routeLineView: MapboxRouteLineView
-    private lateinit var replayProgressObserver: ReplayProgressObserver
     private val navigationLocationProvider = NavigationLocationProvider()
-    private val replayRouteMapper = ReplayRouteMapper()
+
+    private var routeRequested = false
+
+    // Fixed Destination: USC Talamban Campus Main Gate
+    private val uscTalambanPoint = Point.fromLngLat(123.9135, 10.3526)
 
     // Activity result launcher for location permissions
     private val locationPermissionRequest =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-                permissions ->
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             when {
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true -> {
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
+                        permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true -> {
                     initializeMapComponents()
                 }
                 else -> {
-                    Toast.makeText(
-                        this,
-                        "Location permissions denied. Please enable permissions in settings.",
-                        Toast.LENGTH_LONG
-                    )
-                        .show()
+                    Toast.makeText(this, "Location permissions denied.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -78,25 +74,22 @@ class Navigation : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // check/request location permissions
-        if (
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            // Permissions are already granted
+        // Request Fine Location for accurate driving directions
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             initializeMapComponents()
         } else {
-            // Request location permissions
-            locationPermissionRequest.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION))
+            locationPermissionRequest.launch(arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ))
         }
     }
 
     private fun initializeMapComponents() {
-        // create a new Mapbox map
         mapView = MapView(this, MapInitOptions(
             this,
             cameraOptions = CameraOptions.Builder()
-                .center(Point.fromLngLat(-122.43539772352648, 37.77440680146262))
+                .center(uscTalambanPoint)
                 .zoom(14.0)
                 .build(),
         ))
@@ -106,7 +99,6 @@ class Navigation : ComponentActivity() {
         mapView.logo.marginBottom = 140f
         mapView.attribution.marginBottom = 140f
 
-        // Initialize location puck using navigationLocationProvider as its data source
         mapView.location.apply {
             setLocationProvider(navigationLocationProvider)
             locationPuck = LocationPuck2D()
@@ -115,124 +107,96 @@ class Navigation : ComponentActivity() {
 
         setContentView(mapView)
 
-        // set viewportDataSource, which tells the navigationCamera where to look
         viewportDataSource = MapboxNavigationViewportDataSource(mapView.mapboxMap)
-
-        // set padding for the navigation camera
         val pixelDensity = this.resources.displayMetrics.density
-        viewportDataSource.followingPadding =
-            EdgeInsets(
-                180.0 * pixelDensity,
-                40.0 * pixelDensity,
-                150.0 * pixelDensity,
-                40.0 * pixelDensity
-            )
+        viewportDataSource.followingPadding = EdgeInsets(
+            180.0 * pixelDensity, 40.0 * pixelDensity, 150.0 * pixelDensity, 40.0 * pixelDensity
+        )
 
-        // initialize a NavigationCamera
         navigationCamera = NavigationCamera(mapView.mapboxMap, mapView.camera, viewportDataSource)
-
-        // Initialize route line api and view for drawing the route on the map
         routeLineApi = MapboxRouteLineApi(MapboxRouteLineApiOptions.Builder().build())
         routeLineView = MapboxRouteLineView(MapboxRouteLineViewOptions.Builder(this).build())
     }
 
-    // routes observer draws a route line and origin/destination circles on the map
     private val routesObserver = RoutesObserver { routeUpdateResult ->
         if (routeUpdateResult.navigationRoutes.isNotEmpty()) {
-            // generate route geometries asynchronously and render them
             routeLineApi.setNavigationRoutes(routeUpdateResult.navigationRoutes) { value ->
                 mapView.mapboxMap.style?.apply { routeLineView.renderRouteDrawData(this, value) }
             }
-
-            // update viewportSourceData to include the new route
             viewportDataSource.onRouteChanged(routeUpdateResult.navigationRoutes.first())
             viewportDataSource.evaluate()
-
-            // set the navigationCamera to OVERVIEW
-            navigationCamera.requestNavigationCameraToOverview()
+            navigationCamera.requestNavigationCameraToFollowing()
         }
     }
 
-    // locationObserver updates the location puck and camera to follow the user's location
-    private val locationObserver =
-        object : LocationObserver {
-            override fun onNewRawLocation(rawLocation: Location) {}
+    private val locationObserver = object : LocationObserver {
+        override fun onNewRawLocation(rawLocation: Location) {}
 
-            override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
-                val enhancedLocation = locationMatcherResult.enhancedLocation
-                // update location puck's position on the map
-                navigationLocationProvider.changePosition(
-                    location = enhancedLocation,
-                    keyPoints = locationMatcherResult.keyPoints,
-                )
+        override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
+            val enhancedLocation = locationMatcherResult.enhancedLocation
 
-                // update viewportDataSource to trigger camera to follow the location
-                viewportDataSource.onLocationChanged(enhancedLocation)
-                viewportDataSource.evaluate()
+            navigationLocationProvider.changePosition(
+                location = enhancedLocation,
+                keyPoints = locationMatcherResult.keyPoints,
+            )
 
-                // set the navigationCamera to FOLLOWING
-                navigationCamera.requestNavigationCameraToFollowing()
+            viewportDataSource.onLocationChanged(enhancedLocation)
+            viewportDataSource.evaluate()
+
+            // As soon as we get a live GPS location, calculate the route to USC Talamban
+            if (!routeRequested) {
+                routeRequested = true
+                val currentUserPoint = Point.fromLngLat(enhancedLocation.longitude, enhancedLocation.latitude)
+                fetchRouteToUSC(currentUserPoint)
             }
         }
+    }
 
-    // define MapboxNavigation
     @OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
-    private val mapboxNavigation: MapboxNavigation by
-    requireMapboxNavigation(
-        onResumedObserver =
-            object : MapboxNavigationObserver {
-                @SuppressLint("MissingPermission")
-                override fun onAttached(mapboxNavigation: MapboxNavigation) {
-                    // register observers
-                    mapboxNavigation.registerRoutesObserver(routesObserver)
-                    mapboxNavigation.registerLocationObserver(locationObserver)
-
-                    replayProgressObserver =
-                        ReplayProgressObserver(mapboxNavigation.mapboxReplayer)
-                    mapboxNavigation.registerRouteProgressObserver(replayProgressObserver)
-                    mapboxNavigation.startReplayTripSession()
-                }
-
-                override fun onDetached(mapboxNavigation: MapboxNavigation) {}
-            },
+    private val mapboxNavigation: MapboxNavigation by requireMapboxNavigation(
+        onResumedObserver = object : MapboxNavigationObserver {
+            @SuppressLint("MissingPermission")
+            override fun onAttached(mapboxNavigation: MapboxNavigation) {
+                mapboxNavigation.registerRoutesObserver(routesObserver)
+                mapboxNavigation.registerLocationObserver(locationObserver)
+                // Start a real trip session using live GPS
+                mapboxNavigation.startTripSession()
+            }
+            override fun onDetached(mapboxNavigation: MapboxNavigation) {}
+        },
         onInitialize = this::initNavigation
     )
 
-    // on initialization of MapboxNavigation, request a route between two fixed points
     @OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
     private fun initNavigation() {
         MapboxNavigationApp.setup(NavigationOptions.Builder(this).build())
 
-        // initialize location puck
         mapView.location.apply {
             setLocationProvider(navigationLocationProvider)
-            this.locationPuck = createDefault2DPuck()
+            this.locationPuck = createDefault2DPuck(withBearing = true)
             enabled = true
         }
+    }
 
-        val origin = Point.fromLngLat(-122.43539772352648, 37.77440680146262)
-        val destination = Point.fromLngLat(-122.42409811526268, 37.76556957793795)
-
+    private fun fetchRouteToUSC(origin: Point) {
         mapboxNavigation.requestRoutes(
             RouteOptions.builder()
                 .applyDefaultNavigationOptions()
-                .coordinatesList(listOf(origin, destination))
+                .coordinatesList(listOf(origin, uscTalambanPoint))
                 .layersList(listOf(mapboxNavigation.getZLevel(), null))
                 .build(),
             object : NavigationRouterCallback {
                 override fun onCanceled(routeOptions: RouteOptions, routerOrigin: String) {}
 
-                override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {}
+                override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                    Toast.makeText(this@Navigation, "Failed to find route.", Toast.LENGTH_SHORT).show()
+                    routeRequested = false // allow retry
+                }
 
                 override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
+                    // Feed the live route to Mapbox
                     mapboxNavigation.setNavigationRoutes(routes)
-
-                    // start simulated user movement
-                    val replayData =
-                        replayRouteMapper.mapDirectionsRouteGeometry(routes.first().directionsRoute)
-                    mapboxNavigation.mapboxReplayer.pushEvents(replayData)
-                    mapboxNavigation.mapboxReplayer.seekTo(replayData[0])
-                    mapboxNavigation.mapboxReplayer.play()
+                    Toast.makeText(this@Navigation, "Navigating to USC Talamban Campus", Toast.LENGTH_SHORT).show()
                 }
             }
         )

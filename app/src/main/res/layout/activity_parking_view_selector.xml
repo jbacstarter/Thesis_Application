@@ -21,9 +21,10 @@
         android:layout_marginTop="48dp"
         android:layout_marginEnd="16dp"
         android:orientation="vertical"
-        android:gravity="end">
+        android:gravity="end"
+        android:clipToPadding="false">
 
-        <!-- Modern Hamburger "Bar" Toggle Button -->
+        <!-- Hamburger / Menu Toggle -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fab_menu_toggle"
             android:layout_width="wrap_content"
@@ -39,50 +40,311 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
+            android:gravity="end"
+            android:clipToPadding="false"
             android:visibility="gone">
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_profile"
+            <!-- PROFILE ITEM -->
+            <LinearLayout
+                android:id="@+id/menu_item_profile"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:src="@android:drawable/ic_menu_myplaces"
-                app:backgroundTint="@android:color/white"
-                app:tint="@color/brand_navy"
-                app:fabCustomSize="48dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_settings"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:src="@android:drawable/ic_menu_manage"
-                app:backgroundTint="@android:color/white"
-                app:tint="@color/brand_navy"
-                app:fabCustomSize="48dp" />
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/tooltip_profile"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    app:cardBackgroundColor="#CC000000"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="4dp"
+                    app:strokeWidth="0dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:text="User Profile"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_about"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:src="@android:drawable/ic_menu_info_details"
-                app:backgroundTint="@android:color/white"
-                app:tint="@color/brand_navy"
-                app:fabCustomSize="48dp" />
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fab_profile"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_myplaces"
+                    app:backgroundTint="@android:color/white"
+                    app:tint="@color/brand_navy"
+                    app:fabCustomSize="48dp" />
+            </LinearLayout>
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_logout"
+            <!-- SETTINGS ITEM -->
+            <LinearLayout
+                android:id="@+id/menu_item_settings"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:src="@android:drawable/ic_lock_power_off"
-                app:backgroundTint="#F44336"
-                app:tint="@android:color/white"
-                app:fabCustomSize="48dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/tooltip_settings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    app:cardBackgroundColor="#CC000000"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="4dp"
+                    app:strokeWidth="0dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:text="Settings"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fab_settings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_preferences"
+                    app:backgroundTint="@android:color/white"
+                    app:tint="@color/brand_navy"
+                    app:fabCustomSize="48dp" />
+            </LinearLayout>
+
+            <!-- ABOUT ITEM -->
+            <LinearLayout
+                android:id="@+id/menu_item_about"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/tooltip_about"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    app:cardBackgroundColor="#CC000000"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="4dp"
+                    app:strokeWidth="0dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:text="About App"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fab_about"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_dialog_info"
+                    app:backgroundTint="@android:color/white"
+                    app:tint="@color/brand_navy"
+                    app:fabCustomSize="48dp" />
+            </LinearLayout>
+
+            <!-- LOGOUT ITEM -->
+            <LinearLayout
+                android:id="@+id/menu_item_logout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/tooltip_logout"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    app:cardBackgroundColor="#CC000000"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="4dp"
+                    app:strokeWidth="0dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:text="Log Out"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fab_logout"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_lock_power_off"
+                    app:backgroundTint="#F44336"
+                    app:tint="@android:color/white"
+                    app:fabCustomSize="48dp" />
+            </LinearLayout>
+
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Modernized Bottom Card -->
+    <!-- ============================================== -->
+    <!-- MODAL OVERLAY CARDS (HIDDEN BY DEFAULT) -->
+    <!-- ============================================== -->
+
+    <!-- PROFILE CARD -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_profile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:layout_margin="24dp"
+        android:visibility="gone"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="20dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:gravity="center_horizontal">
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@android:drawable/ic_menu_myplaces"
+                app:tint="@color/brand_navy" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="User Profile"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_navy" />
+            <TextView
+                android:id="@+id/profile_name_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Loading Name..."
+                android:textSize="18sp" />
+            <TextView
+                android:id="@+id/profile_email_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Loading Email..."
+                android:textSize="16sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_close_profile"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Close"
+                app:cornerRadius="16dp"
+                app:backgroundTint="@color/brand_navy" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- SETTINGS CARD -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_settings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:layout_margin="24dp"
+        android:visibility="gone"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="20dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Settings"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_navy" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="• Notifications (Coming Soon)\n• Theme Preferences (Coming Soon)\n• Account Management"
+                android:textSize="16sp"
+                android:lineSpacingExtra="8dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_close_settings"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Close"
+                app:cornerRadius="16dp"
+                app:backgroundTint="@color/brand_navy" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- ABOUT CARD -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_about"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:layout_margin="24dp"
+        android:visibility="gone"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="20dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:gravity="center_horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="About Application"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_navy" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Thesis Parking Application\nVersion 1.0.0\n\nDeveloped for seamless and modern parking management and navigation."
+                android:textAlignment="center"
+                android:textSize="16sp"
+                android:lineSpacingExtra="4dp"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_close_about"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Close"
+                app:cornerRadius="16dp"
+                app:backgroundTint="@color/brand_navy" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- ============================================== -->
+    <!-- Bottom Parking Info Card -->
+    <!-- ============================================== -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/bottom_parking_card"
         android:layout_width="match_parent"
@@ -102,7 +364,6 @@
             android:paddingTop="20dp"
             android:paddingBottom="24dp">
 
-            <!-- Title & Sleek Navigation Arrows -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -119,7 +380,6 @@
                     android:textStyle="bold"
                     android:textColor="@color/brand_navy" />
 
-                <!-- Modern Circular Left Arrow -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_prev_slot"
                     android:layout_width="44dp"
@@ -133,7 +393,6 @@
                     android:insetBottom="0dp"
                     android:padding="0dp" />
 
-                <!-- Modern Circular Right Arrow -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_next_slot"
                     android:layout_width="44dp"
