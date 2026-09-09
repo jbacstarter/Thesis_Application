@@ -2,8 +2,10 @@ package com.thesis.thesisapplication.activities
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,12 +13,12 @@ import androidx.core.app.ActivityCompat
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
-import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.MapInitOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.attribution.attribution
 import com.mapbox.maps.plugin.compass.compass
 import com.mapbox.maps.plugin.locationcomponent.createDefault2DPuck
@@ -36,6 +38,7 @@ import com.mapbox.navigation.core.lifecycle.MapboxNavigationObserver
 import com.mapbox.navigation.core.lifecycle.requireMapboxNavigation
 import com.mapbox.navigation.core.trip.session.LocationMatcherResult
 import com.mapbox.navigation.core.trip.session.LocationObserver
+import com.mapbox.navigation.core.trip.session.RouteProgressObserver
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
 import com.mapbox.navigation.ui.maps.location.NavigationLocationProvider
@@ -43,6 +46,7 @@ import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
+import java.util.Locale
 
 class Navigation : ComponentActivity() {
     private lateinit var mapView: MapView
@@ -52,12 +56,15 @@ class Navigation : ComponentActivity() {
     private lateinit var routeLineView: MapboxRouteLineView
     private val navigationLocationProvider = NavigationLocationProvider()
 
-    private var routeRequested = false
+    // --- ZERO-LAG OFFLINE AI VOICE ENGINE ---
+    private lateinit var textToSpeech: TextToSpeech
+    private var lastInstruction: String? = null
 
-    // Fixed Destination: USC Talamban Campus Main Gate
+    private var routeRequested = false
+    private var hasArrived = false
+
     private val uscTalambanPoint = Point.fromLngLat(123.9135, 10.3526)
 
-    // Activity result launcher for location permissions
     private val locationPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             when {
@@ -74,7 +81,13 @@ class Navigation : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Request Fine Location for accurate driving directions
+        // Initialize Android's Native AI Voice (Completely Offline & Instant)
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                textToSpeech.language = Locale.US
+            }
+        }
+
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             initializeMapComponents()
         } else {
@@ -90,14 +103,25 @@ class Navigation : ComponentActivity() {
             this,
             cameraOptions = CameraOptions.Builder()
                 .center(uscTalambanPoint)
-                .zoom(14.0)
+                .zoom(16.0)
+                .pitch(45.0) // <--- GOOGLE MAPS 3D TILT PERSPECTIVE
                 .build(),
         ))
 
         mapView.scalebar.marginTop = 200f
-        mapView.compass.marginTop = 200f
         mapView.logo.marginBottom = 140f
         mapView.attribution.marginBottom = 140f
+
+        // --- MAPBOX COMPASS RE-CENTER OVERRIDE ---
+        mapView.compass.apply {
+            marginTop = 200f
+            fadeWhenFacingNorth = false // Keep visible so user can always tap it
+            addCompassClickListener {
+                // When compass is clicked, instantly snap camera back to the car
+                navigationCamera.requestNavigationCameraToFollowing()
+                Toast.makeText(this@Navigation, "Re-centered", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         mapView.location.apply {
             setLocationProvider(navigationLocationProvider)
@@ -105,6 +129,7 @@ class Navigation : ComponentActivity() {
             enabled = true
         }
 
+        // We can go back to directly using MapView as the ContentView!
         setContentView(mapView)
 
         viewportDataSource = MapboxNavigationViewportDataSource(mapView.mapboxMap)
@@ -129,6 +154,20 @@ class Navigation : ComponentActivity() {
         }
     }
 
+    // --- BULLETPROOF PUBLIC API ROUTE PROGRESS OBSERVER ---
+    private val routeProgressObserver = RouteProgressObserver { routeProgress ->
+        // Grab the raw text instruction (e.g., "Turn right onto Main Street")
+        val currentInstruction = routeProgress.currentLegProgress?.currentStepProgress?.step?.maneuver()?.instruction()
+
+        // If it's a new instruction, pass it instantly to the Android AI Voice chip
+        if (currentInstruction != null && currentInstruction != lastInstruction) {
+            lastInstruction = currentInstruction
+            if (::textToSpeech.isInitialized) {
+                textToSpeech.speak(currentInstruction, TextToSpeech.QUEUE_FLUSH, null, null)
+            }
+        }
+    }
+
     private val locationObserver = object : LocationObserver {
         override fun onNewRawLocation(rawLocation: Location) {}
 
@@ -143,11 +182,36 @@ class Navigation : ComponentActivity() {
             viewportDataSource.onLocationChanged(enhancedLocation)
             viewportDataSource.evaluate()
 
-            // As soon as we get a live GPS location, calculate the route to USC Talamban
             if (!routeRequested) {
                 routeRequested = true
                 val currentUserPoint = Point.fromLngLat(enhancedLocation.longitude, enhancedLocation.latitude)
                 fetchRouteToUSC(currentUserPoint)
+            }
+
+            // --- DEPART TO 2D PARKING VIEW UPON ARRIVAL ---
+            if (routeRequested && !hasArrived) {
+                val results = FloatArray(1)
+                android.location.Location.distanceBetween(
+                    enhancedLocation.latitude, enhancedLocation.longitude,
+                    uscTalambanPoint.latitude(), uscTalambanPoint.longitude(),
+                    results
+                )
+
+                // Trigger Arrival at < 50 meters
+                if (results[0] < 50f) {
+                    hasArrived = true
+                    Toast.makeText(this@Navigation, "Arrived at USC Campus!", Toast.LENGTH_LONG).show()
+
+                    if (::textToSpeech.isInitialized) {
+                        textToSpeech.speak("You have arrived at U.S.C. Talamban Campus. Switching to parking view.", TextToSpeech.QUEUE_FLUSH, null, null)
+                    }
+
+                    val intent = Intent(this@Navigation, ParkingMapActivity::class.java)
+                    intent.putExtra("TARGET_SLOT_X", getIntent().getIntExtra("TARGET_SLOT_X", -1))
+                    intent.putExtra("TARGET_SLOT_Y", getIntent().getIntExtra("TARGET_SLOT_Y", -1))
+                    startActivity(intent)
+                    finish()
+                }
             }
         }
     }
@@ -159,7 +223,10 @@ class Navigation : ComponentActivity() {
             override fun onAttached(mapboxNavigation: MapboxNavigation) {
                 mapboxNavigation.registerRoutesObserver(routesObserver)
                 mapboxNavigation.registerLocationObserver(locationObserver)
-                // Start a real trip session using live GPS
+
+                // Register our custom, crash-proof voice tracker
+                mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
+
                 mapboxNavigation.startTripSession()
             }
             override fun onDetached(mapboxNavigation: MapboxNavigation) {}
@@ -190,15 +257,23 @@ class Navigation : ComponentActivity() {
 
                 override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
                     Toast.makeText(this@Navigation, "Failed to find route.", Toast.LENGTH_SHORT).show()
-                    routeRequested = false // allow retry
+                    routeRequested = false
                 }
 
                 override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
-                    // Feed the live route to Mapbox
                     mapboxNavigation.setNavigationRoutes(routes)
                     Toast.makeText(this@Navigation, "Navigating to USC Talamban Campus", Toast.LENGTH_SHORT).show()
                 }
             }
         )
+    }
+
+    // Always release the AI Voice Engine when leaving the map to save phone RAM
+    override fun onDestroy() {
+        if (::textToSpeech.isInitialized) {
+            textToSpeech.stop()
+            textToSpeech.shutdown()
+        }
+        super.onDestroy()
     }
 }

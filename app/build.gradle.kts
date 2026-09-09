@@ -43,6 +43,8 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-database")
+
     implementation("com.google.android.gms:play-services-auth:21.6.0")
 
     implementation("com.mapbox.navigationcore:android-ndk27:3.26.0")

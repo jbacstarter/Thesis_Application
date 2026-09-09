@@ -17,7 +17,7 @@ import android.view.SurfaceView
 import com.thesis.thesisapplication.R
 import org.json.JSONObject
 import java.io.InputStream
-
+import java.util.concurrent.ConcurrentHashMap
 
 class ParkingSelectorView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -33,23 +33,38 @@ class ParkingSelectorView @JvmOverloads constructor(
     private var mapHeight = 0
     private val mapLayers = mutableListOf<IntArray>()
 
+    // --- THREAD-SAFE RTDB STORAGE (0=Green, 1=Red, 2=Grey) ---
+    private val liveSlotStatuses = ConcurrentHashMap<String, Int>()
+
     // --- SELECTION VARIABLES ---
     @Volatile private var selectedX: Int = -1
     @Volatile private var selectedY: Int = -1
-    @Volatile private var isSelectedOccupied = false
+    @Volatile private var selectedState = 0
 
     // --- ANIMATION VARIABLES ---
     @Volatile private var highlightScale = 1.0f
     @Volatile private var highlightAlpha = 0f
 
-    // Modern Highlight Paints (Fill + Stroke for a sleek target-box look)
-    private val greenFill = Paint().apply { color = Color.rgb(76, 175, 80); style = Paint.Style.FILL }
-    private val redFill = Paint().apply { color = Color.rgb(244, 67, 54); style = Paint.Style.FILL }
-    private val greenStroke = Paint().apply { color = Color.rgb(76, 175, 80); style = Paint.Style.STROKE; strokeWidth = 8f }
-    private val redStroke = Paint().apply { color = Color.rgb(244, 67, 54); style = Paint.Style.STROKE; strokeWidth = 8f }
+    // --- ALWAYS-ON DEFAULT PAINTS (Faint Fill, Thin Solid Outline) ---
+    private val defaultGreenFill = Paint().apply { color = Color.argb(40, 76, 175, 80); style = Paint.Style.FILL }
+    private val defaultRedFill = Paint().apply { color = Color.argb(40, 244, 67, 54); style = Paint.Style.FILL }
+    private val defaultGreyFill = Paint().apply { color = Color.argb(40, 158, 158, 158); style = Paint.Style.FILL }
+
+    private val defaultGreenStroke = Paint().apply { color = Color.argb(150, 76, 175, 80); style = Paint.Style.STROKE; strokeWidth = 4f }
+    private val defaultRedStroke = Paint().apply { color = Color.argb(150, 244, 67, 54); style = Paint.Style.STROKE; strokeWidth = 4f }
+    private val defaultGreyStroke = Paint().apply { color = Color.argb(150, 158, 158, 158); style = Paint.Style.STROKE; strokeWidth = 4f }
+
+    // --- SELECTED PAINTS (Darker Fill, Thicker Outline) ---
+    private val selectedGreenFill = Paint().apply { color = Color.rgb(76, 175, 80); style = Paint.Style.FILL }
+    private val selectedRedFill = Paint().apply { color = Color.rgb(244, 67, 54); style = Paint.Style.FILL }
+    private val selectedGreyFill = Paint().apply { color = Color.rgb(158, 158, 158); style = Paint.Style.FILL }
+
+    private val selectedGreenStroke = Paint().apply { color = Color.rgb(76, 175, 80); style = Paint.Style.STROKE; strokeWidth = 8f }
+    private val selectedRedStroke = Paint().apply { color = Color.rgb(244, 67, 54); style = Paint.Style.STROKE; strokeWidth = 8f }
+    private val selectedGreyStroke = Paint().apply { color = Color.rgb(158, 158, 158); style = Paint.Style.STROKE; strokeWidth = 8f }
 
     interface OnSlotSelectedListener {
-        fun onSlotSelected(x: Int, y: Int, isOccupied: Boolean)
+        fun onSlotSelected(x: Int, y: Int, state: Int)
     }
     var slotListener: OnSlotSelectedListener? = null
 
@@ -105,6 +120,11 @@ class ParkingSelectorView @JvmOverloads constructor(
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun updateLiveStatuses(statuses: Map<String, Int>) {
+        liveSlotStatuses.clear()
+        liveSlotStatuses.putAll(statuses)
     }
 
     override fun performClick(): Boolean {
@@ -177,7 +197,6 @@ class ParkingSelectorView @JvmOverloads constructor(
     }
 
     private fun updateAnimation(dt: Float) {
-        // Smoothly interpolates the scale and alpha for that modern pop-in effect
         highlightScale += (1.0f - highlightScale) * 15f * dt
         highlightAlpha += (1.0f - highlightAlpha) * 15f * dt
     }
@@ -204,36 +223,53 @@ class ParkingSelectorView @JvmOverloads constructor(
                 }
             }
 
-            // --- MODERN 5x3 ANIMATED HIGHLIGHT ---
-            if (selectedX != -1 && selectedY != -1) {
-                val centerX = (selectedX + 2.5f) * tileSize
-                val centerY = (selectedY + 0.5f) * tileSize
+            val cornerRadius = 16f
+            val slots = getAllParkingSlots()
 
-                val baseWidth = 5f * tileSize
-                val baseHeight = 3f * tileSize
+            for ((index, slot) in slots.withIndex()) {
+                val slotName = "P${index + 1}"
+                val state = liveSlotStatuses[slotName] ?: 2 // Default to unknown (2) if no data
+                val isSelected = (slot.x == selectedX && slot.y == selectedY)
 
-                val currentWidth = baseWidth * highlightScale
-                val currentHeight = baseHeight * highlightScale
+                val centerX = (slot.x + 2.5f) * tileSize
+                val centerY = (slot.y + 0.5f) * tileSize
 
-                val highlightRect = RectF(
-                    centerX - currentWidth / 2f,
-                    centerY - currentHeight / 2f,
-                    centerX + currentWidth / 2f,
-                    centerY + currentHeight / 2f
+                val baseWidth = 4.8f * tileSize
+                val baseHeight = 2.8f * tileSize
+
+                val defaultRect = RectF(
+                    centerX - baseWidth / 2f,
+                    centerY - baseHeight / 2f,
+                    centerX + baseWidth / 2f,
+                    centerY + baseHeight / 2f
                 )
 
-                val currentFillAlpha = (100f * highlightAlpha).toInt().coerceIn(0, 255)
-                val currentStrokeAlpha = (255f * highlightAlpha).toInt().coerceIn(0, 255)
+                val defFill = when(state) { 1 -> defaultRedFill; 2 -> defaultGreyFill; else -> defaultGreenFill }
+                val defStroke = when(state) { 1 -> defaultRedStroke; 2 -> defaultGreyStroke; else -> defaultGreenStroke }
 
-                val fillPaint = if (isSelectedOccupied) redFill else greenFill
-                val strokePaint = if (isSelectedOccupied) redStroke else greenStroke
+                canvas.drawRoundRect(defaultRect, cornerRadius, cornerRadius, defFill)
+                canvas.drawRoundRect(defaultRect, cornerRadius, cornerRadius, defStroke)
 
-                fillPaint.alpha = currentFillAlpha
-                strokePaint.alpha = currentStrokeAlpha
+                if (isSelected) {
+                    val currentWidth = baseWidth * highlightScale
+                    val currentHeight = baseHeight * highlightScale
 
-                val cornerRadius = 16f
-                canvas.drawRoundRect(highlightRect, cornerRadius, cornerRadius, fillPaint)
-                canvas.drawRoundRect(highlightRect, cornerRadius, cornerRadius, strokePaint)
+                    val highlightRect = RectF(
+                        centerX - currentWidth / 2f,
+                        centerY - currentHeight / 2f,
+                        centerX + currentWidth / 2f,
+                        centerY + currentHeight / 2f
+                    )
+
+                    val selFill = when(state) { 1 -> selectedRedFill; 2 -> selectedGreyFill; else -> selectedGreenFill }
+                    val selStroke = when(state) { 1 -> selectedRedStroke; 2 -> selectedGreyStroke; else -> selectedGreenStroke }
+
+                    selFill.alpha = (100f * highlightAlpha).toInt().coerceIn(0, 255)
+                    selStroke.alpha = (255f * highlightAlpha).toInt().coerceIn(0, 255)
+
+                    canvas.drawRoundRect(highlightRect, cornerRadius, cornerRadius, selFill)
+                    canvas.drawRoundRect(highlightRect, cornerRadius, cornerRadius, selStroke)
+                }
             }
 
         } finally {
@@ -267,18 +303,25 @@ class ParkingSelectorView @JvmOverloads constructor(
     fun selectSlotProgrammatically(x: Int, y: Int) {
         selectedX = x
         selectedY = y
-        isSelectedOccupied = (x + y) % 2 == 0
 
-        // Reset animation states so it "pops" every time a new slot is selected
+        val slots = getAllParkingSlots()
+        val index = slots.indexOfFirst { it.x == x && it.y == y }
+
+        selectedState = if (index != -1) {
+            val slotName = "P${index + 1}"
+            liveSlotStatuses[slotName] ?: 2
+        } else {
+            2
+        }
+
         highlightScale = 1.3f
         highlightAlpha = 0.0f
 
-        // Play audio and haptic feedback
         post {
             playSoundEffect(SoundEffectConstants.CLICK)
             performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
         }
 
-        slotListener?.onSlotSelected(selectedX, selectedY, isSelectedOccupied)
+        slotListener?.onSlotSelected(selectedX, selectedY, selectedState)
     }
 }
