@@ -12,6 +12,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.Log
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -44,13 +45,13 @@ class ParkingView @JvmOverloads constructor(
     private var mapHeight = 0
     private val mapLayers = mutableListOf<IntArray>()
 
-    // --- ANIMATED RED PATH VARIABLES ---
     private var lastTargetX = -1
     private var lastTargetY = -1
     private var pathPhase = 0f
-    private val fullPathPixels = mutableListOf<PointF>()
+
+    // --- CLASSIC DASHED PATH ---
     private val pathPaint = Paint().apply {
-        color = Color.rgb(244, 67, 54) // Red
+        color = Color.rgb(244, 67, 54)
         style = Paint.Style.STROKE
         strokeWidth = 10f
         strokeCap = Paint.Cap.ROUND
@@ -86,9 +87,7 @@ class ParkingView @JvmOverloads constructor(
 
         for (row in atlasMapping.indices) {
             for (col in atlasMapping[row].indices) {
-                val oldId = atlasMapping[row][col]
-                val calculatedIndex = (row * 4) + col
-                idToAtlasIndex[oldId] = calculatedIndex
+                idToAtlasIndex[atlasMapping[row][col]] = (row * 4) + col
             }
         }
         loadMapFromJSON()
@@ -122,9 +121,8 @@ class ParkingView @JvmOverloads constructor(
 
     private fun isWalkable(gridX: Int, gridY: Int): Boolean {
         if (gridX !in 0 until mapWidth || gridY !in 0 until mapHeight) return false
-        val tileIndex = gridY * mapWidth + gridX
         for (layer in mapLayers) {
-            if (layer[tileIndex] in ROAD_TILES) return true
+            if (layer[gridY * mapWidth + gridX] in ROAD_TILES) return true
         }
         return false
     }
@@ -164,71 +162,67 @@ class ParkingView @JvmOverloads constructor(
     }
 
     fun spawnCarAndPark(targetGridX: Int, targetGridY: Int) {
-        lastTargetX = targetGridX
-        lastTargetY = targetGridY
+        try {
+            lastTargetX = targetGridX
+            lastTargetY = targetGridY
 
-        val spawnRowY = 1
-        var leftMostRoadX = 11
+            val spawnRowY = 1
+            var leftMostRoadX = 11
 
-        for (x in 0 until mapWidth) {
-            var isRoad = false
-            for (layer in mapLayers) {
-                if (layer[spawnRowY * mapWidth + x] in ROAD_TILES) {
-                    isRoad = true; break
+            for (x in 0 until mapWidth) {
+                var isRoad = false
+                for (layer in mapLayers) {
+                    if (layer[spawnRowY * mapWidth + x] in ROAD_TILES) {
+                        isRoad = true; break
+                    }
                 }
+                if (isRoad) { leftMostRoadX = x; break }
             }
-            if (isRoad) { leftMostRoadX = x; break }
-        }
 
-        myCar.x = (leftMostRoadX + 1.5f) * tileSize
-        myCar.y = (spawnRowY + 0.5f) * tileSize
-        myCar.rotationDegrees = 180f
-        myCar.waypoints.clear()
-        myCar.speed = 0f
-        myCar.isParked = false
-        myCar.parkTimer = 0f
-        fullPathPixels.clear()
+            myCar.x = (leftMostRoadX + 1.5f) * tileSize
+            myCar.y = (spawnRowY + 0.5f) * tileSize
+            myCar.rotationDegrees = 180f
+            myCar.waypoints.clear()
+            myCar.currentSpeed = 0f
+            myCar.isParked = false
+            myCar.parkTimer = 0f
 
-        // 1. Add Spawn Point to visual path
-        fullPathPixels.add(PointF(myCar.x, myCar.y))
-
-        var roadTargetX = targetGridX
-        while (roadTargetX >= 0) {
-            var isRoad = false
-            for (layer in mapLayers) {
-                if (layer[targetGridY * mapWidth + roadTargetX] in ROAD_TILES) {
-                    isRoad = true; break
+            var roadTargetX = targetGridX
+            while (roadTargetX >= 0) {
+                var isRoad = false
+                for (layer in mapLayers) {
+                    if (layer[targetGridY * mapWidth + roadTargetX] in ROAD_TILES) {
+                        isRoad = true; break
+                    }
                 }
-            }
-            if (isRoad) break
-            roadTargetX--
-        }
-
-        val path = findPath(leftMostRoadX, spawnRowY, roadTargetX, targetGridY)
-
-        if (path.isNotEmpty()) {
-            val pixelWaypoints = mutableListOf<PointF>()
-
-            for (point in path) {
-                pixelWaypoints.add(PointF((point.x * tileSize) + (tileSize / 2), (point.y * tileSize) + (tileSize / 2)))
+                if (isRoad) break
+                roadTargetX--
             }
 
-            val entrancePixelX = (targetGridX * tileSize) + (tileSize / 2)
-            val parkingPixelY = (targetGridY * tileSize) + (tileSize / 2)
-            pixelWaypoints.add(PointF(entrancePixelX, parkingPixelY))
+            val path = findPath(leftMostRoadX, spawnRowY, roadTargetX, targetGridY)
 
-            val deepParkPixelX = entrancePixelX + (tileSize * 1.5f)
-            pixelWaypoints.add(PointF(deepParkPixelX, parkingPixelY))
+            if (path.isNotEmpty()) {
+                val pixelWaypoints = mutableListOf<PointF>()
 
-            myCar.waypoints.addAll(pixelWaypoints)
-            fullPathPixels.addAll(pixelWaypoints)
+                for (point in path) {
+                    pixelWaypoints.add(PointF((point.x * tileSize) + (tileSize / 2), (point.y * tileSize) + (tileSize / 2)))
+                }
+
+                val entrancePixelX = (targetGridX * tileSize) + (tileSize / 2)
+                val parkingPixelY = (targetGridY * tileSize) + (tileSize / 2)
+                pixelWaypoints.add(PointF(entrancePixelX, parkingPixelY))
+
+                val deepParkPixelX = entrancePixelX + (tileSize * 1.5f)
+                pixelWaypoints.add(PointF(deepParkPixelX, parkingPixelY))
+
+                myCar.waypoints.addAll(pixelWaypoints)
+            }
+        } catch (e: Exception) {
+            Log.e("ParkingView", "Crash safely prevented in spawnCarAndPark: ${e.message}")
         }
     }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        // Touch to navigate removed as requested.
-        return true
-    }
+    override fun onTouchEvent(event: MotionEvent): Boolean { return true }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         isRunning = true
@@ -239,8 +233,9 @@ class ParkingView @JvmOverloads constructor(
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         if (mapWidth > 0) {
             tileSize = width.toFloat() / mapWidth
+
             if (myCar.waypoints.isEmpty() && myCar.x == 0f) {
-                myCar.x = -1000f // hide initially
+                myCar.x = -1000f
             }
         }
     }
@@ -264,13 +259,12 @@ class ParkingView @JvmOverloads constructor(
             val dt = (now - lastTime) / 1000f
             lastTime = now
 
-            // Update Dash Path Animation Flow
+            // Animate dashes
             pathPhase -= 60f * dt
             pathPaint.pathEffect = DashPathEffect(floatArrayOf(30f, 20f), pathPhase)
 
-            myCar.update(dt)
+            myCar.update(dt, tileSize)
 
-            // Loop logic: Restart the animation 2 seconds after the car finishes parking
             if (myCar.isParked) {
                 myCar.parkTimer += dt
                 if (myCar.parkTimer > 2.0f && lastTargetX != -1) {
@@ -308,18 +302,19 @@ class ParkingView @JvmOverloads constructor(
                 }
             }
 
-            // 2. Draw Animated Red Route Path
-            if (fullPathPixels.size >= 2) {
+            // 2. Erase Behind Car: Draw path starting FROM car's current position to the remaining waypoints
+            if (!myCar.isParked && myCar.waypoints.isNotEmpty()) {
                 val path = Path()
-                path.moveTo(fullPathPixels[0].x, fullPathPixels[0].y)
-                for (i in 1 until fullPathPixels.size) {
-                    path.lineTo(fullPathPixels[i].x, fullPathPixels[i].y)
+                path.moveTo(myCar.x, myCar.y) // Anchor start of line to the moving car!
+
+                for (wp in myCar.waypoints) {
+                    path.lineTo(wp.x, wp.y)
                 }
                 canvas.drawPath(path, pathPaint)
             }
 
             // 3. Draw Car
-            myCar.draw(canvas)
+            myCar.draw(canvas, tileSize)
 
         } finally {
             holder.unlockCanvasAndPost(canvas)
@@ -342,15 +337,16 @@ class Car(
     var y: Float
 ) {
     var rotationDegrees: Float = 180f
-    var speed: Float = 0f
+    var currentSpeed: Float = 0f
 
     var isParked = false
     var parkTimer = 0f
 
     val waypoints = CopyOnWriteArrayList<PointF>()
-    private val autoPilotSpeed: Float = 200f
 
-    fun update(dt: Float) {
+    fun update(dt: Float, tileSize: Float) {
+        val autoPilotSpeed = tileSize * 6.0f
+
         if (waypoints.isNotEmpty()) {
             val target = waypoints.firstOrNull() ?: return
 
@@ -358,33 +354,33 @@ class Car(
             val dy = target.y - y
             val distance = hypot(dx.toDouble(), dy.toDouble()).toFloat()
 
-            if (distance < 15f) {
+            if (distance < tileSize * 0.2f) {
                 waypoints.remove(target)
                 if (waypoints.isEmpty()) {
-                    speed = 0f
+                    currentSpeed = 0f
                     rotationDegrees = 90f
-                    isParked = true // Trigger the 2-second restart timer
+                    isParked = true
                 }
             } else {
                 val targetAngleRadians = atan2(dy.toDouble(), dx.toDouble())
                 rotationDegrees = Math.toDegrees(targetAngleRadians).toFloat() + 90f
-                speed = autoPilotSpeed
+                currentSpeed = autoPilotSpeed
             }
         } else {
-            speed = 0f
+            currentSpeed = 0f
         }
 
         if (!isParked) {
             val radians = Math.toRadians(rotationDegrees.toDouble())
-            x += (speed * sin(radians) * dt).toFloat()
-            y -= (speed * cos(radians) * dt).toFloat()
+            x += (currentSpeed * sin(radians) * dt).toFloat()
+            y -= (currentSpeed * cos(radians) * dt).toFloat()
         }
     }
 
-    fun draw(canvas: Canvas) {
-        val sizeIncrease = 3f
-        val carWidth = carImage.width.toFloat() + sizeIncrease
-        val carHeight = carImage.height.toFloat() + sizeIncrease
+    fun draw(canvas: Canvas, tileSize: Float) {
+        val carWidth = tileSize * 1.6f
+        val aspectRatio = carImage.height.toFloat() / carImage.width.toFloat()
+        val carHeight = carWidth * aspectRatio
 
         val left = x - (carWidth / 2)
         val top = y - (carHeight / 2)

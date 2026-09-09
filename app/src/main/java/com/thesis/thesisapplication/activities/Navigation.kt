@@ -4,12 +4,22 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
+import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
+import androidx.core.graphics.toColorInt
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
@@ -41,6 +51,7 @@ import com.mapbox.navigation.core.trip.session.LocationObserver
 import com.mapbox.navigation.core.trip.session.RouteProgressObserver
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
+import com.mapbox.navigation.ui.maps.camera.state.NavigationCameraState
 import com.mapbox.navigation.ui.maps.location.NavigationLocationProvider
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
@@ -48,6 +59,8 @@ import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
 import java.util.Locale
 
+@OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
+@SuppressLint("RestrictedApi", "MissingPermission")
 class Navigation : ComponentActivity() {
     private lateinit var mapView: MapView
     private lateinit var viewportDataSource: MapboxNavigationViewportDataSource
@@ -56,14 +69,14 @@ class Navigation : ComponentActivity() {
     private lateinit var routeLineView: MapboxRouteLineView
     private val navigationLocationProvider = NavigationLocationProvider()
 
-    // --- ZERO-LAG OFFLINE AI VOICE ENGINE ---
+    private lateinit var recenterButton: FloatingActionButton
     private lateinit var textToSpeech: TextToSpeech
     private var lastInstruction: String? = null
 
     private var routeRequested = false
     private var hasArrived = false
 
-    private val uscTalambanPoint = Point.fromLngLat(123.9135, 10.3526)
+    private val uscTalambanPoint = Point.fromLngLat(123.9127959, 10.3526954)
 
     private val locationPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -72,16 +85,14 @@ class Navigation : ComponentActivity() {
                         permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true -> {
                     initializeMapComponents()
                 }
-                else -> {
-                    Toast.makeText(this, "Location permissions denied.", Toast.LENGTH_LONG).show()
-                }
+                else -> Toast.makeText(this, "Location permissions denied.", Toast.LENGTH_LONG).show()
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
-        // Initialize Android's Native AI Voice (Completely Offline & Instant)
         textToSpeech = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 textToSpeech.language = Locale.US
@@ -99,28 +110,27 @@ class Navigation : ComponentActivity() {
     }
 
     private fun initializeMapComponents() {
+        val masterLayout = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(masterLayout) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
         mapView = MapView(this, MapInitOptions(
             this,
-            cameraOptions = CameraOptions.Builder()
-                .center(uscTalambanPoint)
-                .zoom(16.0)
-                .pitch(45.0) // <--- GOOGLE MAPS 3D TILT PERSPECTIVE
-                .build(),
+            cameraOptions = CameraOptions.Builder().center(uscTalambanPoint).zoom(16.0).pitch(45.0).build()
         ))
 
         mapView.scalebar.marginTop = 200f
         mapView.logo.marginBottom = 140f
         mapView.attribution.marginBottom = 140f
-
-        // --- MAPBOX COMPASS RE-CENTER OVERRIDE ---
         mapView.compass.apply {
             marginTop = 200f
-            fadeWhenFacingNorth = false // Keep visible so user can always tap it
-            addCompassClickListener {
-                // When compass is clicked, instantly snap camera back to the car
-                navigationCamera.requestNavigationCameraToFollowing()
-                Toast.makeText(this@Navigation, "Re-centered", Toast.LENGTH_SHORT).show()
-            }
+            fadeWhenFacingNorth = false
         }
 
         mapView.location.apply {
@@ -129,18 +139,44 @@ class Navigation : ComponentActivity() {
             enabled = true
         }
 
-        // We can go back to directly using MapView as the ContentView!
-        setContentView(mapView)
+        masterLayout.addView(mapView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        recenterButton = FloatingActionButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_mylocation)
+            backgroundTintList = ColorStateList.valueOf(Color.WHITE)
+            imageTintList = ColorStateList.valueOf("#1C1C1C".toColorInt())
+            hide()
+
+            setOnClickListener {
+                navigationCamera.requestNavigationCameraToFollowing()
+                Toast.makeText(this@Navigation, "Camera Re-centered", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        val density = resources.displayMetrics.density
+        val btnParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM or Gravity.END
+            bottomMargin = (140 * density).toInt()
+            marginEnd = (16 * density).toInt()
+        }
+
+        masterLayout.addView(recenterButton, btnParams)
+        setContentView(masterLayout)
 
         viewportDataSource = MapboxNavigationViewportDataSource(mapView.mapboxMap)
-        val pixelDensity = this.resources.displayMetrics.density
-        viewportDataSource.followingPadding = EdgeInsets(
-            180.0 * pixelDensity, 40.0 * pixelDensity, 150.0 * pixelDensity, 40.0 * pixelDensity
-        )
+        viewportDataSource.followingPadding = EdgeInsets(180.0 * density, 40.0 * density, 150.0 * density, 40.0 * density)
 
         navigationCamera = NavigationCamera(mapView.mapboxMap, mapView.camera, viewportDataSource)
         routeLineApi = MapboxRouteLineApi(MapboxRouteLineApiOptions.Builder().build())
         routeLineView = MapboxRouteLineView(MapboxRouteLineViewOptions.Builder(this).build())
+
+        navigationCamera.registerNavigationCameraStateChangeObserver { cameraState ->
+            if (cameraState == NavigationCameraState.FOLLOWING || cameraState == NavigationCameraState.TRANSITION_TO_FOLLOWING) {
+                recenterButton.hide()
+            } else {
+                recenterButton.show()
+            }
+        }
     }
 
     private val routesObserver = RoutesObserver { routeUpdateResult ->
@@ -154,17 +190,36 @@ class Navigation : ComponentActivity() {
         }
     }
 
-    // --- BULLETPROOF PUBLIC API ROUTE PROGRESS OBSERVER ---
     private val routeProgressObserver = RouteProgressObserver { routeProgress ->
-        // Grab the raw text instruction (e.g., "Turn right onto Main Street")
-        val currentInstruction = routeProgress.currentLegProgress?.currentStepProgress?.step?.maneuver()?.instruction()
 
-        // If it's a new instruction, pass it instantly to the Android AI Voice chip
+        // --- Erase the blue line behind the car ---
+        routeLineApi.updateWithRouteProgress(routeProgress) { result ->
+            mapView.mapboxMap.style?.apply {
+                routeLineView.renderRouteLineUpdate(this, result)
+            }
+        }
+
+        val currentInstruction = routeProgress.currentLegProgress?.currentStepProgress?.step?.maneuver()?.instruction()
         if (currentInstruction != null && currentInstruction != lastInstruction) {
             lastInstruction = currentInstruction
             if (::textToSpeech.isInitialized) {
                 textToSpeech.speak(currentInstruction, TextToSpeech.QUEUE_FLUSH, null, null)
             }
+        }
+
+        if (routeProgress.distanceRemaining < 15f && !hasArrived) {
+            hasArrived = true
+            Toast.makeText(this@Navigation, "Arrived at USC Campus!", Toast.LENGTH_LONG).show()
+
+            if (::textToSpeech.isInitialized) {
+                textToSpeech.speak("You have arrived at U.S.C. Talamban Campus. Switching to parking view.", TextToSpeech.QUEUE_FLUSH, null, null)
+            }
+
+            val intent = Intent(this@Navigation, ParkingMapActivity::class.java)
+            intent.putExtra("TARGET_SLOT_X", getIntent().getIntExtra("TARGET_SLOT_X", -1))
+            intent.putExtra("TARGET_SLOT_Y", getIntent().getIntExtra("TARGET_SLOT_Y", -1))
+            startActivity(intent)
+            finish()
         }
     }
 
@@ -173,58 +228,27 @@ class Navigation : ComponentActivity() {
 
         override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
             val enhancedLocation = locationMatcherResult.enhancedLocation
-
             navigationLocationProvider.changePosition(
                 location = enhancedLocation,
                 keyPoints = locationMatcherResult.keyPoints,
             )
-
             viewportDataSource.onLocationChanged(enhancedLocation)
             viewportDataSource.evaluate()
 
+            // Fetch the route immediately on real GPS ping
             if (!routeRequested) {
                 routeRequested = true
                 val currentUserPoint = Point.fromLngLat(enhancedLocation.longitude, enhancedLocation.latitude)
                 fetchRouteToUSC(currentUserPoint)
             }
-
-            // --- DEPART TO 2D PARKING VIEW UPON ARRIVAL ---
-            if (routeRequested && !hasArrived) {
-                val results = FloatArray(1)
-                android.location.Location.distanceBetween(
-                    enhancedLocation.latitude, enhancedLocation.longitude,
-                    uscTalambanPoint.latitude(), uscTalambanPoint.longitude(),
-                    results
-                )
-
-                // Trigger Arrival at < 50 meters
-                if (results[0] < 50f) {
-                    hasArrived = true
-                    Toast.makeText(this@Navigation, "Arrived at USC Campus!", Toast.LENGTH_LONG).show()
-
-                    if (::textToSpeech.isInitialized) {
-                        textToSpeech.speak("You have arrived at U.S.C. Talamban Campus. Switching to parking view.", TextToSpeech.QUEUE_FLUSH, null, null)
-                    }
-
-                    val intent = Intent(this@Navigation, ParkingMapActivity::class.java)
-                    intent.putExtra("TARGET_SLOT_X", getIntent().getIntExtra("TARGET_SLOT_X", -1))
-                    intent.putExtra("TARGET_SLOT_Y", getIntent().getIntExtra("TARGET_SLOT_Y", -1))
-                    startActivity(intent)
-                    finish()
-                }
-            }
         }
     }
 
-    @OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
     private val mapboxNavigation: MapboxNavigation by requireMapboxNavigation(
         onResumedObserver = object : MapboxNavigationObserver {
-            @SuppressLint("MissingPermission")
             override fun onAttached(mapboxNavigation: MapboxNavigation) {
                 mapboxNavigation.registerRoutesObserver(routesObserver)
                 mapboxNavigation.registerLocationObserver(locationObserver)
-
-                // Register our custom, crash-proof voice tracker
                 mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
 
                 mapboxNavigation.startTripSession()
@@ -234,7 +258,6 @@ class Navigation : ComponentActivity() {
         onInitialize = this::initNavigation
     )
 
-    @OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
     private fun initNavigation() {
         MapboxNavigationApp.setup(NavigationOptions.Builder(this).build())
 
@@ -268,7 +291,6 @@ class Navigation : ComponentActivity() {
         )
     }
 
-    // Always release the AI Voice Engine when leaving the map to save phone RAM
     override fun onDestroy() {
         if (::textToSpeech.isInitialized) {
             textToSpeech.stop()

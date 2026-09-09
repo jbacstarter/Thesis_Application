@@ -11,24 +11,21 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <com.google.android.material.imageview.ShapeableImageView
-            android:layout_width="300dp"
-            android:layout_height="200dp"
-            android:layout_gravity="top"
-            android:layout_marginTop="45dp"
-            android:background="@android:color/transparent"
-            android:layout_marginStart="50dp"
-            android:layout_marginEnd="10dp"
-            android:src="@drawable/gopark_logo_transparent"
-            android:scaleType="centerCrop" />
-
         <LinearLayout
-            android:layout_gravity="center_vertical"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="30dp"
-            android:layout_margin="10sp">
+            android:paddingHorizontal="32dp"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="220dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="40dp"
+                android:background="@android:color/transparent"
+                android:src="@drawable/gopark_logo_transparent"
+                android:adjustViewBounds="true" />
 
             <TextView
                 android:id="@+id/login_email_label"
@@ -37,19 +34,19 @@
                 android:text="Email"
                 android:fontFamily="monospace"
                 android:textColor="@color/brand_navy"
-                android:layout_gravity="start"
-                android:layout_marginLeft="10dp"
+                android:layout_marginStart="4dp"
                 android:textStyle="bold"
                 android:textSize="16sp"/>
 
             <EditText
                 android:id="@+id/login_input_email"
-                android:layout_margin="10dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="52dp"
                 android:fontFamily="sans-serif"
                 android:cursorVisible="true"
-                android:padding="10sp"
+                android:paddingHorizontal="16dp"
                 android:textColor="@color/brand_navy"
                 android:background="@drawable/input_border" />
 
@@ -60,29 +57,27 @@
                 android:text="Password"
                 android:fontFamily="monospace"
                 android:textColor="@color/brand_navy"
-                android:layout_gravity="start"
-                android:layout_marginLeft="10dp"
+                android:layout_marginStart="4dp"
                 android:textStyle="bold"
                 android:textSize="16sp"/>
 
             <EditText
                 android:id="@+id/login_input_password"
-                android:layout_margin="10dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="24dp"
                 android:layout_width="match_parent"
-                android:layout_height="45dp"
+                android:layout_height="52dp"
                 android:cursorVisible="true"
-                android:padding="10sp"
+                android:paddingHorizontal="16dp"
                 android:fontFamily="sans-serif"
                 android:inputType="textPassword"
                 android:textColor="@color/brand_navy"
                 android:background="@drawable/input_border"/>
 
             <LinearLayout
-                android:layout_gravity="center"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="10dp"
                 android:gravity="center_vertical">
 
                 <TextView
@@ -90,10 +85,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/forgot_password"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textColor="@color/brand_navy"
                     android:fontFamily="sans-serif"
-                    android:layout_marginLeft="10dp"
+                    android:layout_marginStart="4dp"
                     android:textStyle="italic"
                     android:linksClickable="true" />
 
@@ -105,8 +100,7 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/login_button"
                     android:layout_width="120dp"
-                    android:layout_height="52dp"
-                    android:layout_gravity="end"
+                    android:layout_height="56dp"
                     app:backgroundTint="@color/brand_orange"
                     android:fontFamily="sans-serif"
                     android:text="Log in"
